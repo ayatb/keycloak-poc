@@ -92,49 +92,7 @@ Keycloak uses this endpoint to validate received JWT-SVIDs.
 ---
 
 ## Detailed Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                      Docker Compose Network                      │
-│                                                                  │
-│  ┌──────────────────┐        ┌─────────────────────────────┐     │
-│  │  SPIRE Server    │◄───────│  OIDC Discovery Provider    │     │
-│  │                  │        │                             │     │
-│  │ • Authority for  │        │ • Publishes public keys     │     │
-│  │   signatures     │        │ • OIDC/.well-known format   │     │
-│  │ • Manages SVIDs  │        │ • Port: 6443 (HTTPS)        │     │
-│  │                  │        │ • Port: 8008 (Health)       │     │
-│  └────────┬─────────┘        └─────────────────────────────┘     │
-│           │ Unix Socket                      ▲                   │
-│           │ (/tmp/spire-server/private)      │ Fetch bundles     │
-│           │                                  │                   │
-│  ┌────────▼──────────────────┐               │                   │
-│  │    SPIRE Agent            │               │                   │
-│  │                           │               │                   │
-│  │ • Identifies workloads    │◄──────────────┘                   │
-│  │ • Exposes Workload API    │                                   │
-│  │   (socket: agent.sock)    │                                   │
-│  │ • Registers via token     │                                   │
-│  └────────┬──────────────────┘                                   │
-│           │ Unix Socket                                          │
-│           │ (/opt/spire/sockets/agent.sock)                      │
-│           │                                                      │
-│  ┌────────▼──────────────┐         ┌──────────────────────┐      │
-│  │  Workload (Go Client) │         │    Keycloak          │      │
-│  │                       │         │                      │      │
-│  │ 1. Fetch JWT-SVID ────┼────────▶│ • Realm: spiffe      │      │
-│  │    from Agent         │         │ • Client: mcp-client │      │
-│  │                       │         │ • Features: spiffe   │      │
-│  │ 2. Exchange for token │         │   client-auth-feder  │      │
-│  │    via curl ──────────┼────────▶│ • Port: 8443 (HTTPS) │      │
-│  │                       │         │ • Port: 9000 (Health)│      │
-│  │ 3. Receive access     │◄────────┤                      │      │
-│  │    token              │         │ Validate JWT-SVID    │      │
-│  │                       │         │ via OIDC Discovery   │      │
-│  └───────────────────────┘         └──────────────────────┘      │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
+![secretless-Authentication-Keycloak-SPIFFE-SPIRE.png](images/secretless-Authentication-Keycloak-SPIFFE-SPIRE.png)
 
 ---
 
