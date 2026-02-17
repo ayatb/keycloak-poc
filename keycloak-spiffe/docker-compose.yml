@@ -1,0 +1,100 @@
+services:
+  spire-server:
+    container_name: spire-server
+    hostname: spire-server
+    image: ghcr.io/spiffe/spire-server:1.14.0
+    volumes:
+      - ./spire-server:/opt/spire/conf/server
+      - spire-server-sockets:/tmp/spire-server/private:rw
+    command: ["-config", "/opt/spire/conf/server/server.conf"]
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-server", "healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+  spire-agent:
+    container_name: spire-agent
+    image: ghcr.io/spiffe/spire-agent:1.14.0
+    pid: "host"
+    user: "0:0"
+    volumes:
+      - ./spire-agent:/opt/spire/conf/server:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - spire-agent-sockets:/opt/spire/sockets:rw
+    command: ["-config", "/opt/spire/conf/server/agent.conf","-joinToken", "f7b4da98-6e04-40cb-b562-96a59b8b3701"]
+    depends_on:
+      spire-server:
+          condition: service_healthy
+    labels:
+      - localhost.idyatech.fr=spire-agent
+  oidc-discovery-provider:
+    image: ghcr.io/spiffe/oidc-discovery-provider:1.14.0
+    container_name: oidc-discovery-provider
+    command: ["-config", "/opt/spire/conf/server/oidc-discovery-provider.conf"]
+    ports:
+      - "8008:8008"
+      - "6443:6443"
+    volumes:
+      - ./oidc-discovery-provider:/opt/spire/conf/server
+      - spire-server-sockets:/tmp/spire-server/private:rw
+    depends_on:
+      spire-server:
+        condition: service_healthy
+
+#
+  workload:
+    build: ./workload
+    container_name: workload
+    environment:
+      - SPIFFE_ENDPOINT_SOCKET=unix:///opt/spire/sockets/agent.sock
+      - AUDIENCE=https://localhost.idyatech.fr:8443/auth/realms/spiffe
+    volumes:
+      - spire-agent-sockets:/opt/spire/sockets:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    depends_on:
+      - spire-agent
+    labels:
+      - docker:label:localhost.idyatech.fr:workload
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.3
+    container_name: keycloak
+    environment:
+      HOSTNAME: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: true
+      KC_HTTP_ENABLED: true
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: localhost.idyatech.fr
+    command:
+      - start
+      - --http-port=8180
+      - --https-certificate-file=/opt/keycloak/conf/ssl/cert.pem
+      - --https-certificate-key-file=/opt/keycloak/conf/ssl/key.pem
+      - --features=spiffe,client-auth-federated
+      - --log-level=INFO,org.apache.http:DEBUG
+      - --http-access-log-enabled=true
+      - --import-realm
+    ports:
+      - "8180:8180"
+      - "8443:8443"
+      - "9000:9000"
+    volumes:
+      - keycloak:/opt/keycloak/data
+      - ./keycloak/ssl:/opt/keycloak/conf/ssl:ro
+      - ./keycloak/truststores:/opt/keycloak/conf/truststores:ro
+      - ./keycloak/spiffe-realm.json:/opt/keycloak/data/import/spiffe-realm.json:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+#
+volumes:
+  spire-agent-sockets:
+  spire-server-sockets:
+  keycloak:
