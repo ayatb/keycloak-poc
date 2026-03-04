@@ -22,7 +22,7 @@ services:
       - ./spire-agent:/opt/spire/conf/server:ro
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - spire-agent-sockets:/opt/spire/sockets:rw
-    command: ["-config", "/opt/spire/conf/server/agent.conf","-joinToken", "f7b4da98-6e04-40cb-b562-96a59b8b3701"]
+    command: ["-config", "/opt/spire/conf/server/agent.conf","-joinToken", "14ef41f9-f386-4956-8c6d-b11534894754"]
     depends_on:
       spire-server:
           condition: service_healthy
@@ -48,7 +48,11 @@ services:
     container_name: workload
     environment:
       - SPIFFE_ENDPOINT_SOCKET=unix:///opt/spire/sockets/agent.sock
+      - KEYCLOAK_URL=https://keycloak:8443
+      - REALM=spiffe
       - AUDIENCE=https://localhost.idyatech.fr:8443/auth/realms/spiffe
+      - IDP_ALIAS=spiffe
+      - TZ=Europe/Paris
     volumes:
       - spire-agent-sockets:/opt/spire/sockets:rw
       - /var/run/docker.sock:/var/run/docker.sock:rw
@@ -68,6 +72,8 @@ services:
       KC_HTTP_ENABLED: true
       KC_HTTP_RELATIVE_PATH: /auth
       KC_HOSTNAME: localhost.idyatech.fr
+      DEBUG: true
+      DEBUG_PORT: "*:8787"
     command:
       - start
       - --http-port=8180
@@ -81,17 +87,19 @@ services:
       - "8180:8180"
       - "8443:8443"
       - "9000:9000"
+      - "8787:8787"
     volumes:
       - keycloak:/opt/keycloak/data
       - ./keycloak/ssl:/opt/keycloak/conf/ssl:ro
       - ./keycloak/truststores:/opt/keycloak/conf/truststores:ro
       - ./keycloak/spiffe-realm.json:/opt/keycloak/data/import/spiffe-realm.json:ro
+      - ./../keycloak-spiffe-dcr/target/keycloak-spiffe-dcr-1.0-SNAPSHOT.jar:/opt/keycloak/providers/keycloak-spiffe-dcr-1.0-SNAPSHOT.jar:ro
     healthcheck:
-      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      test: ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/9000"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 
 #
 volumes:
