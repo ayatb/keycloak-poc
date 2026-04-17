@@ -78,6 +78,27 @@ docker compose up --build
 
 ---
 
+### 4. JWT Authorization Grant – AI Agent Identity Propagation
+
+A POC demonstrating how an **AI Agent** can exchange a corporate JWT token for an access token in a target realm using the **JWT Authorization Grant** (`urn:ietf:params:oauth:grant-type:jwt-bearer`), propagating user identity without exposing credentials.
+
+**Key Features:**
+- PKCE-based authentication on the corporate IdP
+- Token exchange via JWT Authorization Grant (RFC 7523)
+- User identity propagation without re-authentication
+- No credential exposure to the target realm
+- Standards-based, interoperable, and auditable
+
+👉 **[Go to JWT Authorization Grant Guide](./keycloak-JWT-authorization-grant/README.md)**
+
+**Quick Start:**
+```bash
+cd keycloak-JWT-authorization-grant
+docker compose up --build
+```
+
+---
+
 ## Getting Started
 
 Each POC is self-contained in its own directory with:
